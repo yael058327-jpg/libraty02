@@ -1,0 +1,865 @@
+[index (1).html](https://github.com/user-attachments/files/35437087/index.1.html)
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ספריית הכיתה שלנו - ניהול השאלות וסריקת QR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Heebo', sans-serif;
+            background-color: #f8fafc;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background-color: white !important;
+            }
+            .qr-card {
+                break-inside: avoid;
+                page-break-inside: avoid;
+                border: 1px dashed #94a3b8 !important;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header / Navigation -->
+    <header class="bg-indigo-600 text-white shadow-md no-print">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <span class="text-3xl">📚</span>
+                <div>
+                    <h1 class="text-xl font-bold leading-tight">ספריית הכיתה שלנו</h1>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <p class="text-indigo-200 text-xs">מערכת סריקה והשאלת ספרים</p>
+                        <span id="sync-status" class="text-[11px] bg-indigo-800/80 text-indigo-100 px-2 py-0.5 rounded-full">⏳ מתחבר לענן...</span>
+                    </div>
+                </div>
+            </div>
+            <nav class="flex flex-wrap gap-2">
+                <button onclick="switchTab('scan')" id="tab-scan" class="tab-btn bg-white text-indigo-700 font-bold px-4 py-2 rounded-lg shadow-sm transition">
+                    📷 תחנת סריקה
+                </button>
+                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn bg-indigo-700 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg transition">
+                    📊 מצב ספרים בכיתה
+                </button>
+                <button onclick="switchTab('manage')" id="tab-manage" class="tab-btn bg-indigo-700 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg transition">
+                    ⚙️ תלמידות וספרים
+                </button>
+                <button onclick="switchTab('print')" id="tab-print" class="tab-btn bg-indigo-700 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg transition">
+                    🖨️ הדפסת קודי QR
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-6">
+
+        <!-- TAB 1: SCANNER STATION -->
+        <section id="view-scan" class="tab-view space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- Left/Top: Camera & Input -->
+                <div class="lg:col-span-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center">
+                    <div class="w-full flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold text-slate-800">סורק QR</h2>
+                        <div class="flex gap-2">
+                            <button onclick="loadFromCloud(true)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 rounded-lg transition" title="רענן נתונים מהענן">
+                                🔄 סנכרן עכשיו
+                            </button>
+                            <button id="btn-start-cam" onclick="startCamera()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition">
+                                הפעל מצלמה
+                            </button>
+                            <button id="btn-stop-cam" onclick="stopCamera()" class="hidden bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition">
+                                כבה מצלמה
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Camera Viewport -->
+                    <div id="reader" class="w-full max-w-sm rounded-xl overflow-hidden bg-slate-100 border-2 border-dashed border-slate-300 min-h-[250px] flex items-center justify-center">
+                        <p class="text-slate-400 text-sm text-center p-4">לחצי על "הפעל מצלמה" כדי לסרוק דרך המצלמה,<br>או השתמשי בסורק חיצוני / הקלדה למטה</p>
+                    </div>
+
+                    <!-- Physical Scanner / Manual Input -->
+                    <div class="w-full mt-5 pt-4 border-t border-slate-100">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">סריקה עם סורק USB / הזנת קוד ידנית (למשל: STU-001 או BOOK-001):</label>
+                        <form onsubmit="handleManualScan(event)" class="flex gap-2">
+                            <input type="text" id="manual-code-input" placeholder="התמקדי כאן וסרקי..." class="flex-grow border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off">
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                אישור
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Right/Bottom: Active Student Session -->
+                <div class="lg:col-span-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-bold text-slate-800">פעולה נוכחית</h2>
+                            <button onclick="resetScanSession()" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium bg-indigo-50 px-3 py-1 rounded-lg">
+                                🔄 סיום / תלמידה הבאה
+                            </button>
+                        </div>
+
+                        <!-- Step 1: Student Identification -->
+                        <div id="session-student-box" class="p-4 rounded-xl border-2 border-indigo-200 bg-indigo-50/50 mb-4 transition">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-2xl font-bold" id="student-avatar">
+                                    👧
+                                </div>
+                                <div>
+                                    <div class="text-xs text-indigo-600 font-bold uppercase tracking-wider">שלב 1: זיהוי תלמידה</div>
+                                    <div id="active-student-name" class="text-xl font-extrabold text-slate-800">ממתין לסריקת כרטיס תלמידה...</div>
+                                    <div id="active-student-current-books" class="text-xs text-slate-500 mt-0.5"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Books Scanned in this session -->
+                        <div class="space-y-2">
+                            <div class="text-xs font-bold text-slate-500">שלב 2: סריקת ספרים (החזרה / השאלה):</div>
+                            <div id="session-log" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                <div class="text-sm text-slate-400 italic bg-slate-50 p-3 rounded-lg text-center">
+                                    לאחר סריקת כרטיס התלמידה, סרקי את הספר שהיא מחזירה ואת הספר החדש שהיא לוקחת.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Feedback Banner -->
+                    <div id="scan-feedback" class="mt-4 hidden p-3 rounded-xl text-sm font-bold text-center"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: DASHBOARD -->
+        <section id="view-dashboard" class="tab-view hidden space-y-6">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <div class="text-slate-500 text-xs font-bold">סה״כ ספרים בספרייה</div>
+                    <div id="stat-total-books" class="text-2xl font-extrabold text-slate-800 mt-1">0</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <div class="text-emerald-600 text-xs font-bold">פנויים על המדף</div>
+                    <div id="stat-available-books" class="text-2xl font-extrabold text-emerald-600 mt-1">0</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <div class="text-indigo-600 text-xs font-bold">בהשאלה אצל בנות</div>
+                    <div id="stat-borrowed-books" class="text-2xl font-extrabold text-indigo-600 mt-1">0</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <div class="text-rose-600 text-xs font-bold">איחור (מעל 7 ימים)</div>
+                    <div id="stat-overdue-books" class="text-2xl font-extrabold text-rose-600 mt-1">0</div>
+                </div>
+            </div>
+
+            <!-- Filter & Table -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <div class="flex items-center gap-3">
+                        <h2 class="font-bold text-slate-800">מעקב השאלות וספרים</h2>
+                        <button onclick="loadFromCloud(true)" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium px-2.5 py-1 rounded-lg transition">
+                            🔄 רענן מהענן
+                        </button>
+                    </div>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <select id="filter-status" onchange="renderDashboard()" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white">
+                            <option value="all">כל הספרים</option>
+                            <option value="borrowed">מושאלים כרגע</option>
+                            <option value="overdue">באיחור (מעל שבוע)</option>
+                            <option value="available">פנויים בספרייה</option>
+                        </select>
+                        <input type="text" id="search-dashboard" oninput="renderDashboard()" placeholder="חיפוש ספר או תלמידה..." class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-grow">
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4 font-bold">קוד ספר</th>
+                                <th class="py-3 px-4 font-bold">שם הספר</th>
+                                <th class="py-3 px-4 font-bold">סטטוס</th>
+                                <th class="py-3 px-4 font-bold">נמצא אצל</th>
+                                <th class="py-3 px-4 font-bold">תאריך השאלה</th>
+                                <th class="py-3 px-4 font-bold">פעולה מהירה</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboard-table-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: MANAGE STUDENTS & BOOKS -->
+        <section id="view-manage" class="tab-view hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <!-- Students Management -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-800">👧 רשימת תלמידות (<span id="count-students">0</span>)</h2>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">הדביקי שמות תלמידות (שם אחד בכל שורה) להוספה מהירה:</label>
+                        <textarea id="bulk-students-input" rows="4" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="נועה כהן&#10;מאיה לוי&#10;תמר ישראלי"></textarea>
+                        <button onclick="addBulkStudents()" class="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm transition">
+                            + הוסף תלמידות לרשימה
+                        </button>
+                    </div>
+                    <div class="border-t border-slate-100 pt-3 max-h-64 overflow-y-auto">
+                        <ul id="manage-students-list" class="divide-y divide-slate-100 text-sm"></ul>
+                    </div>
+                </div>
+
+                <!-- Books Management -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-800">📖 רשימת ספרים (<span id="count-books">0</span>)</h2>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">הדביקי שמות ספרים (ספר אחד בכל שורה) להוספה מהירה:</label>
+                        <textarea id="bulk-books-input" rows="4" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="הארי פוטר ואבן החכמים&#10;צ׳רלי והשוקולדה&#10;מטילדה"></textarea>
+                        <button onclick="addBulkBooks()" class="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg text-sm transition">
+                            + הוסף ספרים לספרייה
+                        </button>
+                    </div>
+                    <div class="border-t border-slate-100 pt-3 max-h-64 overflow-y-auto">
+                        <ul id="manage-books-list" class="divide-y divide-slate-100 text-sm"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backup & Reset -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-sm">גיבוי וניהול נתונים (מחובר לענן Google Sheets)</h3>
+                    <p class="text-xs text-slate-500">כל שינוי נשמר אוטומטית בגיליון הגוגל שלכן ומסתנכרן בין כל המכשירים.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="exportBackup()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-4 py-2 rounded-lg">
+                        💾 שמור גיבוי למחשב
+                    </button>
+                    <label class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium px-4 py-2 rounded-lg cursor-pointer">
+                        📂 שחזור מגיבוי
+                        <input type="file" accept=".json" onchange="importBackup(event)" class="hidden">
+                    </label>
+                    <button onclick="clearAllData()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-medium px-4 py-2 rounded-lg border border-rose-200">
+                        🗑️ איפוס נתונים
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: PRINT QR CODES -->
+        <section id="view-print" class="tab-view hidden space-y-6">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4 no-print">
+                <div>
+                    <h2 class="font-bold text-slate-800">הדפסת כרטיסיות ומדבקות QR</h2>
+                    <p class="text-xs text-slate-500">הדפיסי וגזרי: כרטיסיות אישיות לתלמידות ומדבקות להדבקה בכריכה הפנימית של הספרים.</p>
+                </div>
+                <div class="flex gap-2">
+                    <select id="print-filter" onchange="renderQRCodes()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                        <option value="all">הצג הכל (תלמידות + ספרים)</option>
+                        <option value="students">כרטיסיות תלמידות בלבד</option>
+                        <option value="books">מדבקות ספרים בלבד</option>
+                    </select>
+                    <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2 rounded-lg shadow-sm flex items-center gap-2">
+                        🖨️ הדפס עכשיו
+                    </button>
+                </div>
+            </div>
+
+            <div id="qr-print-container" class="space-y-8"></div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- CLOUD SYNC CONFIGURATION ---
+        const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbzhIz445WkBE4802_q_hw2XVV33otmkMt4rgdgfXY-KoZtp2p7waTcOBQU2iBcqbctc/exec';
+        const STORAGE_KEY = 'classroom_library_cloud_cache_v2';
+
+        // --- EMBEDDED CLASSROOM DATA (24 STUDENTS & 23 BOOKS) ---
+        const DEFAULT_DATA = {
+            students: [
+                { id: "STU-001", name: "עדי אבו" },
+                { id: "STU-002", name: "מיה ביטון" },
+                { id: "STU-003", name: "שילת בנאי" },
+                { id: "STU-004", name: "הילה דראי" },
+                { id: "STU-005", name: "אילה זיסו" },
+                { id: "STU-006", name: "יהל זיו" },
+                { id: "STU-007", name: "נויה יוסקוביץ" },
+                { id: "STU-008", name: "אסתי כהן" },
+                { id: "STU-009", name: "מאיה כהן" },
+                { id: "STU-010", name: "הילה לוי" },
+                { id: "STU-011", name: "טליה מלכה" },
+                { id: "STU-012", name: "שני מנדלוביץ" },
+                { id: "STU-013", name: "ליבי סויד" },
+                { id: "STU-014", name: "אסתי סקא" },
+                { id: "STU-015", name: "יעל פישר" },
+                { id: "STU-016", name: "ליטל צארום" },
+                { id: "STU-017", name: "הני קנפלמכר" },
+                { id: "STU-018", name: "אוריה שהרבני" },
+                { id: "STU-019", name: "טליה שטרן" },
+                { id: "STU-020", name: "שיר שטרן" },
+                { id: "STU-021", name: "שהם שטיינברגר" },
+                { id: "STU-022", name: "רבקה שיבר" },
+                { id: "STU-023", name: "שירלי שלסינגר" },
+                { id: "STU-024", name: "הדסה שריקי" }
+            ],
+            books: [
+                { id: "BOOK-001", title: "אלי לומד לשמור על הבריאות", borrowerId: null, borrowDate: null },
+                { id: "BOOK-002", title: "אלי לומד להתגבר (לבקש סליחה - לא להעיר הורים - להמתין בסבלנות - לוותר)", borrowerId: null, borrowDate: null },
+                { id: "BOOK-003", title: "אביגיל בת חיל והלמדן הקטן / מנוחה פוקס", borrowerId: null, borrowDate: null },
+                { id: "BOOK-004", title: "אביגיל בת חיל והחתול השחר / מנוחה פוקס", borrowerId: null, borrowDate: null },
+                { id: "BOOK-005", title: "אביגיל בת חיל והגוזל / מנוחה פוקס", borrowerId: null, borrowDate: null },
+                { id: "BOOK-006", title: "(ספר עם כריכה כתומה – הכותרת מוסתרת)", borrowerId: null, borrowDate: null },
+                { id: "BOOK-007", title: "אף פעם לא לבד / מאת: אמא של לאה'לה", borrowerId: null, borrowDate: null },
+                { id: "BOOK-008", title: "מלים שנותנות כח / מאת: אמא של לאה'לה", borrowerId: null, borrowDate: null },
+                { id: "BOOK-009", title: "ספר אחד ושני ילדים / מאת: אמא של לאה'לה", borrowerId: null, borrowDate: null },
+                { id: "BOOK-010", title: "(ספר נוסף בסדרה של \"אמא של לאה'לה\" – הכותרת מוסתרת)", borrowerId: null, borrowDate: null },
+                { id: "BOOK-011", title: "טעם של אמת (סדרת \"שלבים\" – יש שכר למצוות / עודד המפחד)", borrowerId: null, borrowDate: null },
+                { id: "BOOK-012", title: "(ספר דק עם שדרה כחולה – הכותרת מוסתרת)", borrowerId: null, borrowDate: null },
+                { id: "BOOK-013", title: "יונתן לומד להיות גבור אמתי / דבורה בנדיקט", borrowerId: null, borrowDate: null },
+                { id: "BOOK-014", title: "יונתן מחלק מלים טובות והכלב שרצה לדבר / דבורה בנדיקט", borrowerId: null, borrowDate: null },
+                { id: "BOOK-015", title: "בין השלוליות / דבורה בנדיקט", borrowerId: null, borrowDate: null },
+                { id: "BOOK-016", title: "אני רוצה חבר 2 / דבורה בנדיקט", borrowerId: null, borrowDate: null },
+                { id: "BOOK-017", title: "שירה מרגישה גדולה / דקלה יוספסברג", borrowerId: null, borrowDate: null },
+                { id: "BOOK-018", title: "סבא שלי עושה חדשות / אפרת ברזל", borrowerId: null, borrowDate: null },
+                { id: "BOOK-019", title: "אמא נו / מ. פינסקי", borrowerId: null, borrowDate: null },
+                { id: "BOOK-020", title: "כובע המחשבות / נועה לוי", borrowerId: null, borrowDate: null },
+                { id: "BOOK-021", title: "הקוצים שכולם אוהבים / נועה לוי", borrowerId: null, borrowDate: null },
+                { id: "BOOK-022", title: "תופסים פיקוד על התפקוד / אהובה רענן", borrowerId: null, borrowDate: null },
+                { id: "BOOK-023", title: "נטע מגלה תושיה / מרים כהן בלויא", borrowerId: null, borrowDate: null }
+            ],
+            nextStudentId: 25,
+            nextBookId: 24
+        };
+        
+        let appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+
+        let activeStudentId = null;
+        let html5QrcodeScanner = null;
+        let lastScannedCode = '';
+        let lastScanTime = 0;
+
+        function padId(prefix, num) {
+            return `${prefix}-${String(num).padStart(3, '0')}`;
+        }
+
+        function updateSyncBadge(text, type = 'loading') {
+            const badge = document.getElementById('sync-status');
+            if (!badge) return;
+            badge.textContent = text;
+            badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-medium transition ';
+            if (type === 'ok') badge.className += 'bg-emerald-500 text-white';
+            else if (type === 'error') badge.className += 'bg-rose-500 text-white';
+            else badge.className += 'bg-indigo-800/80 text-indigo-100';
+        }
+
+        async function initApp() {
+            const cached = localStorage.getItem(STORAGE_KEY);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed && Array.isArray(parsed.students) && parsed.students.length > 0) {
+                        appData = parsed;
+                    }
+                } catch (e) {}
+            }
+            renderAll();
+            await loadFromCloud(false);
+        }
+
+        async function loadFromCloud(showAlert = false) {
+            updateSyncBadge('⏳ מסנכרן מהענן...', 'loading');
+            try {
+                const response = await fetch(CLOUD_API_URL);
+                const data = await response.json();
+                if (data && Array.isArray(data.students) && data.students.length > 0 && Array.isArray(data.books)) {
+                    appData = data;
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+                    renderAll();
+                    updateSyncBadge('☁️ מסונכרן לענן', 'ok');
+                    if (showAlert) showFeedback('הנתונים סונכרנו בהצלחה מהענן!', 'success');
+                } else {
+                    await saveData();
+                    updateSyncBadge('☁️ מסונכרן לענן', 'ok');
+                }
+            } catch (err) {
+                console.error('Cloud load error:', err);
+                updateSyncBadge('⚠️ מצב לא מקוון', 'error');
+                if (showAlert) showFeedback('שגיאה בחיבור לענן. בדקי חיבור לאינטרנט.', 'error');
+            }
+        }
+
+        async function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+            renderAll();
+            updateSyncBadge('⏳ שומר לענן...', 'loading');
+            try {
+                await fetch(CLOUD_API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(appData)
+                });
+                updateSyncBadge('☁️ נשמר בענן', 'ok');
+            } catch (err) {
+                console.error('Cloud save error:', err);
+                updateSyncBadge('⚠️ שגיאת שמירה לענן', 'error');
+            }
+        }
+
+        // --- NAVIGATION ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-indigo-700', 'font-bold', 'shadow-sm');
+                btn.classList.add('bg-indigo-700', 'text-white', 'font-medium');
+            });
+            const activeBtn = document.getElementById(`tab-${tabName}`);
+            activeBtn.classList.remove('bg-indigo-700', 'text-white', 'font-medium');
+            activeBtn.classList.add('bg-white', 'text-indigo-700', 'font-bold', 'shadow-sm');
+
+            if (tabName !== 'scan' && html5QrcodeScanner) {
+                stopCamera();
+            }
+            if (tabName === 'print') {
+                renderQRCodes();
+            }
+            if (tabName === 'dashboard') {
+                renderDashboard();
+            }
+        }
+
+        // --- SCANNING LOGIC ---
+        function startCamera() {
+            const readerEl = document.getElementById('reader');
+            readerEl.innerHTML = '';
+            document.getElementById('btn-start-cam').classList.add('hidden');
+            document.getElementById('btn-stop-cam').classList.remove('hidden');
+
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 220, height: 220 } },
+                (decodedText) => {
+                    const now = Date.now();
+                    if (decodedText === lastScannedCode && (now - lastScanTime) < 2500) {
+                        return;
+                    }
+                    lastScannedCode = decodedText;
+                    lastScanTime = now;
+                    processScannedCode(decodedText.trim().toUpperCase());
+                },
+                (errorMessage) => { }
+            ).catch(err => {
+                showFeedback('לא הצלחנו לפתוח מצלמה. בדקי הרשאות בדפדפן או השתמשי בסורק חיצוני.', 'error');
+                stopCamera();
+            });
+        }
+
+        function stopCamera() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    html5QrcodeScanner.clear();
+                    html5QrcodeScanner = null;
+                }).catch(() => {});
+            }
+            document.getElementById('reader').innerHTML = '<p class="text-slate-400 text-sm text-center p-4">המצלמה כבויה. לחצי על "הפעל מצלמה" לסריקה.</p>';
+            document.getElementById('btn-start-cam').classList.remove('hidden');
+            document.getElementById('btn-stop-cam').classList.add('hidden');
+        }
+
+        function handleManualScan(e) {
+            e.preventDefault();
+            const input = document.getElementById('manual-code-input');
+            const code = input.value.trim().toUpperCase();
+            if (code) {
+                processScannedCode(code);
+                input.value = '';
+            }
+        }
+
+        function playBeep(success = true) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = success ? 880 : 300;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch (e) {}
+        }
+
+        function processScannedCode(code) {
+            let student = appData.students.find(s => s.id === code);
+            if (student) {
+                activeStudentId = student.id;
+                playBeep(true);
+                updateActiveStudentUI();
+                document.getElementById('session-log').innerHTML = '';
+                showFeedback(`שלום ${student.name}! כעת סרקי את הספרים.`, 'info');
+                return;
+            }
+
+            let book = appData.books.find(b => b.id === code);
+            if (book) {
+                if (book.borrowerId) {
+                    const prevStudent = appData.students.find(s => s.id === book.borrowerId);
+                    const prevName = prevStudent ? prevStudent.name : 'תלמידה';
+                    
+                    book.borrowerId = null;
+                    book.borrowDate = null;
+                    saveData();
+                    playBeep(true);
+                    
+                    addSessionLogItem(`✅ הוחזר: <strong>${book.title}</strong> (היה אצל ${prevName})`, 'emerald');
+                    showFeedback(`הספר "${book.title}" הוחזר בהצלחה!`, 'success');
+                    updateActiveStudentUI();
+                    return;
+                }
+
+                if (!activeStudentId) {
+                    playBeep(false);
+                    showFeedback('⚠️ יש לסרוק קודם את כרטיס התלמידה לפני השאלת ספר חדש!', 'error');
+                    return;
+                }
+
+                const activeStudent = appData.students.find(s => s.id === activeStudentId);
+                book.borrowerId = activeStudent.id;
+                book.borrowDate = new Date().toISOString();
+                saveData();
+                playBeep(true);
+
+                addSessionLogItem(`📖 הושאל לשבוע: <strong>${book.title}</strong> ל${activeStudent.name}`, 'indigo');
+                showFeedback(`הספר "${book.title}" נרשם על שם ${activeStudent.name}!`, 'success');
+                updateActiveStudentUI();
+                return;
+            }
+
+            playBeep(false);
+            showFeedback(`קוד לא נמצא במערכת: ${code}`, 'error');
+        }
+
+        function updateActiveStudentUI() {
+            const nameEl = document.getElementById('active-student-name');
+            const booksEl = document.getElementById('active-student-current-books');
+            const boxEl = document.getElementById('session-student-box');
+
+            if (!activeStudentId) {
+                nameEl.textContent = 'ממתין לסריקת כרטיס תלמידה...';
+                booksEl.textContent = '';
+                boxEl.className = 'p-4 rounded-xl border-2 border-indigo-200 bg-indigo-50/50 mb-4 transition';
+                return;
+            }
+
+            const student = appData.students.find(s => s.id === activeStudentId);
+            if (!student) return;
+            const herBooks = appData.books.filter(b => b.borrowerId === activeStudentId);
+            
+            nameEl.textContent = `${student.name} (${student.id})`;
+            boxEl.className = 'p-4 rounded-xl border-2 border-emerald-400 bg-emerald-50 mb-4 transition';
+            
+            if (herBooks.length === 0) {
+                booksEl.textContent = 'אין לה ספרים מושאלים כרגע.';
+            } else {
+                booksEl.textContent = 'ספרים שרשומים אצלה כרגע: ' + herBooks.map(b => b.title).join(', ');
+            }
+        }
+
+        function addSessionLogItem(htmlText, color) {
+            const log = document.getElementById('session-log');
+            if (log.querySelector('.italic')) {
+                log.innerHTML = '';
+            }
+            const div = document.createElement('div');
+            div.className = `p-3 rounded-lg border text-sm bg-${color}-50 border-${color}-200 text-${color}-900`;
+            div.innerHTML = htmlText;
+            log.prepend(div);
+        }
+
+        function resetScanSession() {
+            activeStudentId = null;
+            updateActiveStudentUI();
+            document.getElementById('session-log').innerHTML = `
+                <div class="text-sm text-slate-400 italic bg-slate-50 p-3 rounded-lg text-center">
+                    מוכן לתלמידה הבאה! סרקי כרטיס תלמידה.
+                </div>`;
+            document.getElementById('scan-feedback').classList.add('hidden');
+            document.getElementById('manual-code-input').focus();
+        }
+
+        function showFeedback(msg, type) {
+            const el = document.getElementById('scan-feedback');
+            el.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-800', 'bg-rose-100', 'text-rose-800', 'bg-indigo-100', 'text-indigo-800');
+            if (type === 'success') el.classList.add('bg-emerald-100', 'text-emerald-800');
+            else if (type === 'error') el.classList.add('bg-rose-100', 'text-rose-800');
+            else el.classList.add('bg-indigo-100', 'text-indigo-800');
+            el.textContent = msg;
+        }
+
+        // --- DASHBOARD ---
+        function renderDashboard() {
+            const total = appData.books.length;
+            const borrowed = appData.books.filter(b => b.borrowerId !== null).length;
+            const available = total - borrowed;
+            
+            const now = Date.now();
+            const weekMs = 7 * 24 * 60 * 60 * 1000;
+            const overdue = appData.books.filter(b => b.borrowerId && b.borrowDate && (now - new Date(b.borrowDate).getTime() > weekMs)).length;
+
+            document.getElementById('stat-total-books').textContent = total;
+            document.getElementById('stat-available-books').textContent = available;
+            document.getElementById('stat-borrowed-books').textContent = borrowed;
+            document.getElementById('stat-overdue-books').textContent = overdue;
+
+            const filter = document.getElementById('filter-status').value;
+            const search = document.getElementById('search-dashboard').value.toLowerCase();
+            const tbody = document.getElementById('dashboard-table-body');
+            tbody.innerHTML = '';
+
+            appData.books.forEach(book => {
+                const student = book.borrowerId ? appData.students.find(s => s.id === book.borrowerId) : null;
+                const studentName = student ? student.name : '';
+                const isOverdue = book.borrowerId && book.borrowDate && (now - new Date(book.borrowDate).getTime() > weekMs);
+
+                if (filter === 'borrowed' && !book.borrowerId) return;
+                if (filter === 'available' && book.borrowerId) return;
+                if (filter === 'overdue' && !isOverdue) return;
+                if (search && !book.title.toLowerCase().includes(search) && !studentName.toLowerCase().includes(search) && !book.id.toLowerCase().includes(search)) return;
+
+                let statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">פנוי על המדף</span>';
+                if (isOverdue) {
+                    statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700">באיחור (מעל שבוע)</span>';
+                } else if (book.borrowerId) {
+                    statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">מושאל</span>';
+                }
+
+                const dateStr = book.borrowDate ? new Date(book.borrowDate).toLocaleDateString('he-IL') : '-';
+                const actionBtn = book.borrowerId 
+                    ? `<button onclick="manualReturnBook('${book.id}')" class="text-xs bg-slate-100 hover:bg-emerald-100 hover:text-emerald-700 text-slate-700 px-2.5 py-1 rounded font-medium transition">סמן כהוחזר</button>`
+                    : '-';
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-xs text-slate-500">${book.id}</td>
+                    <td class="py-3 px-4 font-bold text-slate-800">${book.title}</td>
+                    <td class="py-3 px-4">${statusBadge}</td>
+                    <td class="py-3 px-4 font-medium text-slate-700">${studentName || '-'}</td>
+                    <td class="py-3 px-4 text-slate-500 text-xs">${dateStr}</td>
+                    <td class="py-3 px-4">${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function manualReturnBook(bookId) {
+            const book = appData.books.find(b => b.id === bookId);
+            if (book) {
+                book.borrowerId = null;
+                book.borrowDate = null;
+                saveData();
+            }
+        }
+
+        // --- MANAGE LISTS ---
+        function addBulkStudents() {
+            const textarea = document.getElementById('bulk-students-input');
+            const lines = textarea.value.split('\n').map(l => l.replace(/^\*\s*/, '').trim()).filter(l => l.length > 0);
+            if (lines.length === 0) return;
+
+            lines.forEach(name => {
+                appData.students.push({
+                    id: padId('STU', appData.nextStudentId++),
+                    name: name
+                });
+            });
+            textarea.value = '';
+            saveData();
+        }
+
+        function addBulkBooks() {
+            const textarea = document.getElementById('bulk-books-input');
+            const lines = textarea.value.split('\n').map(l => l.replace(/^\*\s*/, '').trim()).filter(l => l.length > 0);
+            if (lines.length === 0) return;
+
+            lines.forEach(title => {
+                appData.books.push({
+                    id: padId('BOOK', appData.nextBookId++),
+                    title: title,
+                    borrowerId: null,
+                    borrowDate: null
+                });
+            });
+            textarea.value = '';
+            saveData();
+        }
+
+        function deleteStudent(id) {
+            if (!confirm('למחוק תלמידה זו?')) return;
+            appData.students = appData.students.filter(s => s.id !== id);
+            appData.books.forEach(b => { if (b.borrowerId === id) { b.borrowerId = null; b.borrowDate = null; } });
+            saveData();
+        }
+
+        function deleteBook(id) {
+            if (!confirm('למחוק ספר זה?')) return;
+            appData.books = appData.books.filter(b => b.id !== id);
+            saveData();
+        }
+
+        function renderManageLists() {
+            document.getElementById('count-students').textContent = appData.students.length;
+            document.getElementById('count-books').textContent = appData.books.length;
+
+            const sList = document.getElementById('manage-students-list');
+            sList.innerHTML = appData.students.map(s => `
+                <li class="py-2 flex justify-between items-center">
+                    <span><strong class="font-mono text-xs text-indigo-600 ml-2">${s.id}</strong> ${s.name}</span>
+                    <button onclick="deleteStudent('${s.id}')" class="text-rose-400 hover:text-rose-600 text-xs px-2">מחק</button>
+                </li>
+            `).join('');
+
+            const bList = document.getElementById('manage-books-list');
+            bList.innerHTML = appData.books.map(b => `
+                <li class="py-2 flex justify-between items-center">
+                    <span><strong class="font-mono text-xs text-emerald-600 ml-2">${b.id}</strong> ${b.title}</span>
+                    <button onclick="deleteBook('${b.id}')" class="text-rose-400 hover:text-rose-600 text-xs px-2">מחק</button>
+                </li>
+            `).join('');
+        }
+
+        // --- QR CODE GENERATION FOR PRINTING ---
+        function renderQRCodes() {
+            const container = document.getElementById('qr-print-container');
+            const filter = document.getElementById('print-filter').value;
+            container.innerHTML = '';
+
+            if (filter === 'all' || filter === 'students') {
+                const sSection = document.createElement('div');
+                sSection.innerHTML = `<h3 class="text-lg font-bold text-indigo-800 mb-3 border-b pb-1">כרטיסיות תלמידות (${appData.students.length})</h3>`;
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4';
+
+                appData.students.forEach(s => {
+                    const card = document.createElement('div');
+                    card.className = 'qr-card bg-white p-4 rounded-xl border border-slate-300 flex flex-col items-center text-center shadow-sm';
+                    card.innerHTML = `
+                        <div class="text-xs font-bold text-indigo-600 mb-1">כרטיס ספרייה אישי</div>
+                        <div id="qr-${s.id}" class="my-2"></div>
+                        <div class="font-extrabold text-slate-900 text-base mt-1">${s.name}</div>
+                        <div class="text-xs font-mono text-slate-400">${s.id}</div>
+                    `;
+                    grid.appendChild(card);
+                    setTimeout(() => {
+                        new QRCode(document.getElementById(`qr-${s.id}`), {
+                            text: s.id,
+                            width: 110,
+                            height: 110,
+                            colorDark: "#1e1b4b",
+                            colorLight: "#ffffff"
+                        });
+                    }, 10);
+                });
+                sSection.appendChild(grid);
+                container.appendChild(sSection);
+            }
+
+            if (filter === 'all' || filter === 'books') {
+                const bSection = document.createElement('div');
+                bSection.innerHTML = `<h3 class="text-lg font-bold text-emerald-800 mb-3 border-b pb-1 mt-6">מדבקות ספרים (${appData.books.length})</h3>`;
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4';
+
+                appData.books.forEach(b => {
+                    const card = document.createElement('div');
+                    card.className = 'qr-card bg-white p-4 rounded-xl border border-slate-300 flex flex-col items-center text-center shadow-sm';
+                    card.innerHTML = `
+                        <div class="text-xs font-bold text-emerald-600 mb-1">📚 ספרייה כיתתית</div>
+                        <div id="qr-${b.id}" class="my-2"></div>
+                        <div class="font-bold text-slate-900 text-sm mt-1 line-clamp-2">${b.title}</div>
+                        <div class="text-xs font-mono text-slate-400">${b.id}</div>
+                    `;
+                    grid.appendChild(card);
+                    setTimeout(() => {
+                        new QRCode(document.getElementById(`qr-${b.id}`), {
+                            text: b.id,
+                            width: 110,
+                            height: 110,
+                            colorDark: "#064e3b",
+                            colorLight: "#ffffff"
+                        });
+                    }, 10);
+                });
+                bSection.appendChild(grid);
+                container.appendChild(bSection);
+            }
+        }
+
+        // --- BACKUP & RESET ---
+        function exportBackup() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", `library_backup_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+        }
+
+        function importBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.students && imported.books) {
+                        appData = imported;
+                        saveData();
+                        alert('הנתונים שוחזרו ונשמרו לענן בהצלחה!');
+                    } else {
+                        alert('קובץ גיבוי לא תקין.');
+                    }
+                } catch (err) {
+                    alert('שגיאה בקריאת הקובץ.');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearAllData() {
+            if (!confirm('האם את בטוחה שברצונך לאפס את ההשאלות ולחזור לרשימת הבסיס של 24 הבנות ו-23 הספרים?')) return;
+            appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+            saveData();
+            alert('הנתונים אופסו בענן לרשימת הבסיס.');
+        }
+
+        function renderAll() {
+            renderDashboard();
+            renderManageLists();
+        }
+
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
